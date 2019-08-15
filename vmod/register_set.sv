@@ -58,6 +58,7 @@ module register_set
   // disable byte-addressable write & hard-coded!
   always @(posedge clk_a, negedge arstz_aq)
     if (arstz_aq == 1'b0)               slv_reg[0] <= 32'b0;
+    else if (CMD_DONE_VALID)            slv_reg[0] <= 32'b0;
     else if ( (mem_if.en  == 1'b1) &&
               (|mem_if.we == 1'b1) &&
               (data_addr  == 2'b00))    slv_reg[0] <= mem_if.din;
@@ -67,7 +68,7 @@ module register_set
     else if (CMD_DONE_VALID)            slv_reg[1] <= {32{CMD_DONE}};
     else if ( (mem_if.en  == 1'b1) &&
               (|mem_if.we == 1'b1) &&
-              (data_addr  == 2'b00))    slv_reg[1] <= mem_if.din;
+              (data_addr  == 2'b01))    slv_reg[1] <= mem_if.din;
 
   always @(posedge clk_a, negedge arstz_aq)
     if (arstz_aq == 1'b0)               slv_reg[2] <= 32'b0;
