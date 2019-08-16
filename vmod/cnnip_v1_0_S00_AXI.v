@@ -340,7 +340,7 @@ wire [1:0] select = {slv_reg_wren, slv_reg_rden};
 
 always @ (*)
 begin
-  int_mem_if.addr = 'd0;
+  int_mem_if.addr = axi_araddr;
   case(select)
     1'b1 << 0: int_mem_if.addr = axi_araddr;
     1'b1 << 1: int_mem_if.addr = axi_awaddr;
