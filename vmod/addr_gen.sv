@@ -7,10 +7,7 @@
 
 `timescale 1ns / 1ps
 
-module addr_gen #(
-  parameter integer ADDR_WIDTH = 12,
-  parameter integer DATA_WIDTH = 32
-  ) (
+module addr_gen (
   // clock and resetn from domain a
   input  wire clk_a,
   input  wire arstz_aq,
@@ -33,10 +30,10 @@ module addr_gen #(
   wire [3:0] select;
 
   // address multiplexer
-  assign to_register    = (from_axi4l_mem_if.addr[11:8] == 4'h0);
-  assign to_input_mem   = (from_axi4l_mem_if.addr[11:8] == 4'h1);
-  assign to_weight_mem  = (from_axi4l_mem_if.addr[11:8] == 4'h2);
-  assign to_feature_mem = (from_axi4l_mem_if.addr[11:8] == 4'h3);
+  assign to_register    = (from_axi4l_mem_if.addr[15:12] == 4'h0);
+  assign to_input_mem   = (from_axi4l_mem_if.addr[15:12] == 4'h1);
+  assign to_weight_mem  = (from_axi4l_mem_if.addr[15:12] == 4'h2);
+  assign to_feature_mem = (from_axi4l_mem_if.addr[15:12] == 4'h3);
 
   assign select = { to_feature_mem,
                     to_weight_mem,

@@ -62,20 +62,20 @@ module cnnip_v1_0 #
   // interfaces
   cnnip_mem_if reg_set_interconnect();
 
-  cnnip_mem_if input_mem_ext();
-  cnnip_mem_if weight_mem_ext();
-  cnnip_mem_if feature_mem_ext();
+  cnnip_mem_if #(.ADDR_WIDTH(10)) input_mem_ext();
+  cnnip_mem_if #(.ADDR_WIDTH(10)) weight_mem_ext();
+  cnnip_mem_if #(.ADDR_WIDTH(10)) feature_mem_ext();
 
-  cnnip_mem_if input_mem_int();
-  cnnip_mem_if weight_mem_int();
-  cnnip_mem_if feature_mem_int();
+  cnnip_mem_if #(.ADDR_WIDTH(10)) input_mem_int();
+  cnnip_mem_if #(.ADDR_WIDTH(10)) weight_mem_int();
+  cnnip_mem_if #(.ADDR_WIDTH(10)) feature_mem_int();
 
   cnnip_mem_if axi4l_int();
 
   // configuration signals
-  wire 		 	 CMD_DONE;
-  wire 			 CMD_DONE_VALID;
-  wire 			 CMD_START;
+  wire       CMD_DONE;
+  wire       CMD_DONE_VALID;
+  wire       CMD_START;
   wire [7:0] MODE_KERNEL_SIZE;
   wire [7:0] MODE_KERNEL_NUMS;
   wire [1:0] MODE_STRIDE;
@@ -110,10 +110,7 @@ module cnnip_v1_0 #
     .int_mem_if(axi4l_int)
   );
 
-  addr_gen #(
-    .ADDR_WIDTH(12),
-    .DATA_WIDTH(32)
-  ) i_addr_gen (
+  addr_gen i_addr_gen (
     .clk_a     (clk_a),
     .arstz_aq  (arstz_aq),
 
@@ -145,7 +142,7 @@ module cnnip_v1_0 #
   // true dual-port memories
   blk_mem_wrapper #(
     .READ_LATENCY(2),
-    .ADDR_WIDTH(8)
+    .ADDR_WIDTH(10)
   ) input_mem (
     .clk_a(clk_a),
     .arstz_aq(arstz_aq),
@@ -158,7 +155,7 @@ module cnnip_v1_0 #
 
   blk_mem_wrapper #(
     .READ_LATENCY(2),
-    .ADDR_WIDTH(8)
+    .ADDR_WIDTH(10)
   ) weight_memory (
     .clk_a(clk_a),
     .arstz_aq(arstz_aq),
@@ -171,7 +168,7 @@ module cnnip_v1_0 #
 
   blk_mem_wrapper #(
     .READ_LATENCY(2),
-    .ADDR_WIDTH(8)
+    .ADDR_WIDTH(10)
   ) feature_memory (
     .clk_a(clk_a),
     .arstz_aq(arstz_aq),

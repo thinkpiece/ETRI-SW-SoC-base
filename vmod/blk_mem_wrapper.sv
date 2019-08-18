@@ -7,7 +7,7 @@
 `timescale 1ns / 1ps
 
 module blk_mem_wrapper #(
-  parameter ADDR_WIDTH   = 12,
+  parameter ADDR_WIDTH   = 10,
   // parameter DATA_WIDTH   = 31,
   parameter READ_LATENCY = 3
   )(
@@ -39,7 +39,7 @@ module blk_mem_wrapper #(
   reg valid_to_ext_a;
 
   // transition condition calculation
-  assign read_request_a   = (mem_if_a.en == 1'b1 && mem_if_a.we == 1'b0);
+  assign read_request_a   = (mem_if_a.en == 1'b1 && mem_if_a.we == 4'b0);
   assign read_wait_done_a = (wait_counter_a == READ_LATENCY-1);
 
   // state transition
@@ -127,7 +127,7 @@ module blk_mem_wrapper #(
   reg valid_to_ext_b;
 
   // transition condition calculation
-  assign read_request_b   = (mem_if_b.en == 1'b1 && mem_if_b.we == 1'b0);
+  assign read_request_b   = (mem_if_b.en == 1'b1 && mem_if_b.we == 4'b0);
   assign read_wait_done_b = (wait_counter_b == READ_LATENCY-1);
 
   always @(posedge clk_b, negedge arstz_bq)

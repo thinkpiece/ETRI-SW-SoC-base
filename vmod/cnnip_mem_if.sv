@@ -7,7 +7,7 @@
 `timescale 1ns / 1ps
 
 interface cnnip_mem_if #(
-  parameter ADDR_WIDTH = 12,
+  parameter ADDR_WIDTH = 16,
   parameter DATA_WIDTH = 32
 );
   logic                         en;

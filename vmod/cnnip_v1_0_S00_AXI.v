@@ -17,7 +17,7 @@ module cnnip_v1_0_S00_AXI #
   // Width of S_AXI data bus
   parameter integer C_S_AXI_DATA_WIDTH	= 32,
   // Width of S_AXI address bus
-  parameter integer C_S_AXI_ADDR_WIDTH	= 12
+  parameter integer C_S_AXI_ADDR_WIDTH	= 16
 )
 (
   // Users to add ports here
@@ -333,7 +333,7 @@ end
 assign slv_reg_rden = axi_arready & S_AXI_ARVALID & ~axi_rvalid;
 
 assign int_mem_if.en = slv_reg_wren | slv_reg_rden;
-assign int_mem_if.we = (slv_reg_rden==1'b1) ? 0 : S_AXI_WSTRB;
+assign int_mem_if.we = (slv_reg_wren==1'b1) ? S_AXI_WSTRB : 4'b0;
 assign int_mem_if.din = S_AXI_WDATA;
 
 wire [1:0] select = {slv_reg_wren, slv_reg_rden};
