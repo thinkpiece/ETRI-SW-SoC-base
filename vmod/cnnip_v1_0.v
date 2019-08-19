@@ -1,5 +1,5 @@
 /*
- *  register_set.sv -- register set file
+ *  cnnip_v1_0.v -- cnnip top module
  *  ETRI <SW-SoC AI Deep Learning HW Accelerator RTL Design> course material
  *
  *  first draft by Junyoung Park
@@ -134,7 +134,7 @@ module cnnip_v1_0 #
     .MODE_STRIDE(MODE_STRIDE),
     .MODE_PADDING(MODE_PADDING),
     .CMD_START(CMD_START),
-    
+
     .CMD_DONE(CMD_DONE),
     .CMD_DONE_VALID(CMD_DONE_VALID)
   );
