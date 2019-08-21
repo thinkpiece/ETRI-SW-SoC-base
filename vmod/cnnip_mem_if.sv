@@ -6,6 +6,9 @@
  */
 `timescale 1ns / 1ps
 
+`ifndef CNNIP_MEM_IF_DEFINED
+`define CNNIP_MEM_IF_DEFINED
+
 interface cnnip_mem_if #(
   parameter ADDR_WIDTH = 16,
   parameter DATA_WIDTH = 32
@@ -35,3 +38,5 @@ interface cnnip_mem_if #(
     input valid
   );
 endinterface
+
+`endif
