@@ -35,49 +35,60 @@ module cnnip_fifo #(
   reg                   not_empty_next;
   reg                   full_aq;
   reg                   empty_aq;
+  wire                  full_next;
+  wire                  empty_next;
 
-  // assignments
+  // ------------------
+  // empty full control
+  // ------------------
   assign empty_a = empty_aq;
   assign full_a  = full_aq;
 
-  always @(posedge clk_a, negedge arstz_aq)
-    if (arstz_aq == 1'b0) empty_aq <= 1;
-    else empty_aq <= (in_ptr_next == out_ptr_next) && !not_empty_next;
+  assign empty_next = (in_ptr_next == out_ptr_next) && !not_empty_next;
+  assign full_next  = (in_ptr_next == out_ptr_next) && not_empty_next;
 
   always @(posedge clk_a, negedge arstz_aq)
-    if (arstz_aq == 1'b0) full_aq <= 1;
-    else full_aq <= (in_ptr_next == out_ptr_next) && not_empty_next;
+    if (arstz_aq == 1'b0) empty_aq <= 1'b1;
+    else empty_aq <= empty_next;
 
-  assign dout_a = mem[out_ptr];
+  always @(posedge clk_a, negedge arstz_aq)
+    if (arstz_aq == 1'b0) full_aq <= 1'b0;
+    else full_aq <= full_next;
 
+  // -----------------------------------
+  // in(push) / out(pop) pointer control
+  // -----------------------------------
   assign out_ptr_next = (pop_a   == 1'b0)    ? out_ptr :
-                        (out_ptr == DEPTH-1) ? 0       : out_ptr + 1'b1;
+                        (out_ptr == DEPTH-1) ? {(addr_width){1'b0}} :
+                                               out_ptr + 1'b1;
 
   assign in_ptr_next = (push_a == 1'b0)    ? in_ptr :
-                       (in_ptr == DEPTH-1) ? 0      : in_ptr + 1'b1;
+                       (in_ptr == DEPTH-1) ? {(addr_width){1'b0}} :
+                                             in_ptr + 1'b1;
 
-  // sequential blocks
   always @(posedge clk_a, negedge arstz_aq)
-    if (arstz_aq == 1'b0) out_ptr <= 0;
+    if (arstz_aq == 1'b0) out_ptr <= {(addr_width){1'b0}};
     else out_ptr <= out_ptr_next;
 
   always @(posedge clk_a, negedge arstz_aq)
-    if (arstz_aq == 1'b0) in_ptr <= 0;
+    if (arstz_aq == 1'b0) in_ptr <= {(addr_width){1'b0}};
     else in_ptr <= in_ptr_next;
 
   assign out_ptr_reset = ((out_ptr == DEPTH-1) & pop_a);
   assign in_ptr_reset  = ((in_ptr == DEPTH-1) & push_a);
 
   always @(posedge clk_a, negedge arstz_aq)
-    if (arstz_aq == 1'b0) not_empty <= 0;
+    if (arstz_aq == 1'b0) not_empty <= 1'b0;
     else not_empty <= not_empty_next;
 
   always @(*)
-    if (out_ptr_reset & in_ptr_reset)   not_empty_next = not_empty;
+    if (out_ptr_reset & in_ptr_reset)      not_empty_next =  not_empty;
     else if (out_ptr_reset | in_ptr_reset) not_empty_next = ~not_empty;
-    else not_empty_next = not_empty;
+    else                                   not_empty_next = not_empty;
 
   always @(posedge clk_a)
     if (push_a) mem[in_ptr] <= din_a;
+
+  assign dout_a = mem[out_ptr];
 
 endmodule // cnnip_fifo
