@@ -2,13 +2,15 @@
  *  blk_mem_wrapper.v -- true 2-port block ram with parameterized read latency
  *  ETRI <SW-SoC AI Deep Learning HW Accelerator RTL Design> course material
  *
- *  first draft by Junyoung Park
+ *  history:
+ *    first drafted by Junyoung Park
+ *    behaviour model added by Junyoung Park
+ *    1-clock throughput read operations supported by Junyoung Park
  */
 `timescale 1ns / 1ps
 
 module blk_mem_wrapper #(
   parameter ADDR_WIDTH   = 10,
-  // parameter DATA_WIDTH   = 31,
   parameter READ_LATENCY = 3
   )(
   // clock and resetn from domain a
@@ -25,183 +27,103 @@ module blk_mem_wrapper #(
   cnnip_mem_if.slave           mem_if_b
   );
 
-  // FSM for read operation -- WRITE is omitted
-  enum { IDLE, WAIT, READ } state_aq, next_state_a, state_bq, next_state_b;
+  // control signals
+  logic en_to_blkmem_a;
+  logic en_to_blkmem_b;
+  // logic valid_to_ext_a;
+  // logic valid_to_ext_b;
 
-  // read control for port a ---------------------------------------------------
-  wire read_request_a;
-  wire read_wait_done_a;
+  logic read_a_flag;
+  logic read_b_flag;
 
-  reg [1:0] wait_counter_a;
-  reg [1:0] wait_counter_next_a;
+  assign read_a_flag = mem_if_a.en && ((|mem_if_a.we) == 1'b0);
+  assign read_b_flag = mem_if_b.en && ((|mem_if_b.we) == 1'b0);
 
-  reg en_to_blkmem_a;
-  reg valid_to_ext_a;
+  genvar idx;
+  generate
+    if (READ_LATENCY == 1)
+    begin: read_latency_single
 
-  // transition condition calculation
-  assign read_request_a   = (mem_if_a.en == 1'b1 && mem_if_a.we == 4'b0);
-  assign read_wait_done_a = (wait_counter_a == READ_LATENCY-1);
+      // control all signals with simple assignments
+      // for domain a
+      assign en_to_blkmem_a = mem_if_a.en;
+      assign mem_if_a.valid = read_a_flag;
+      // for domain b
+      assign en_to_blkmem_b = mem_if_b.en;
+      assign mem_if_b.valid = read_b_flag;
 
-  // state transition
-  always @(posedge clk_a, negedge arstz_aq)
-    if (arstz_aq == 1'b0) state_aq <= IDLE;
-    else state_aq <= next_state_a;
+    end
+    else
+    begin: read_latency_multi
 
-  always @(*)
-  begin
-    next_state_a = state_aq;
-    case (state_aq)
-      IDLE:
+      // Xilinx's block memory has output register options. Users must hold
+      // the enable signal high for enabling the output registers. The output
+      // registers are up to 2 stages, which means the read latency will be
+      // up to 3 clock cycles.
+
+      // for domain a ----------------------------------------------------------
+      logic [READ_LATENCY-2:0] en_hold_a;
+
+      // prologue
+      always_ff @(posedge clk_a, negedge arstz_aq)
+        if (arstz_aq == 1'b0) en_hold_a[0] <= 1'b0;
+        else en_hold_a[0] <= read_a_flag;
+      // body
+      for (idx=1; idx<READ_LATENCY-2; idx=idx+1)
       begin
-        if (read_request_a)
-        begin
-          if (READ_LATENCY == 1) next_state_a = READ;
-          else                   next_state_a = WAIT;
-        end
+        always_ff @(posedge clk_a, negedge arstz_aq)
+          if (arstz_aq == 1'b0) en_hold_a[idx]<= 1'b0;
+          else en_hold_a[idx] <= en_hold_a[idx-1];
       end
+      // epilogue
+      assign en_to_blkmem_a = mem_if_a.en || (|en_hold_a);
+      assign mem_if_a.valid = en_hold_a[READ_LATENCY-2];
 
-      WAIT:
+      // for domain a ----------------------------------------------------------
+      logic [READ_LATENCY-2:0] en_hold_b;
+
+      // prologue
+      always_ff @(posedge clk_b, negedge arstz_bq)
+        if (arstz_bq == 1'b0) en_hold_b[0] <= 1'b0;
+        else en_hold_b[0] <= read_b_flag;
+      // body
+      for (idx=1; idx<READ_LATENCY-2; idx=idx+1)
       begin
-        if (read_wait_done_a) next_state_a = READ;
+        always_ff @(posedge clk_b, negedge arstz_bq)
+          if (arstz_bq == 1'b0) en_hold_b[idx]<= 1'b0;
+          else en_hold_b[idx] <= en_hold_b[idx-1];
       end
+      // epilogue
+      assign en_to_blkmem_b = mem_if_b.en || (|en_hold_b);
+      assign mem_if_b.valid = en_hold_b[READ_LATENCY-2];
 
-      READ:
-      begin
-        next_state_a = IDLE;
-      end
-    endcase
-  end
+    end
+  endgenerate
 
-  // Clock count for WAIT state
-  always @(posedge clk_a, negedge arstz_aq)
-    if (arstz_aq == 1'b0) wait_counter_a <= 0;
-    else wait_counter_a <= wait_counter_next_a;
+`ifdef SIM_VER
 
-  always @(*)
-  begin
-    wait_counter_next_a = wait_counter_a;
-    case (state_aq)
-      IDLE: wait_counter_next_a = 2'b1;
-      WAIT: wait_counter_next_a = wait_counter_a + 1'b1;
-      default: wait_counter_next_a = 0;
-    endcase
-  end
+  blk_mem_sim #(
+    .DATA_WIDTH  (32),
+    .DATA_DEPTH  (256),
+    .READ_LATENCY(READ_LATENCY)
+  ) i_blk_mem (
+    .clka(clk_a),
+    .ena(en_to_blkmem_a),
+    .wea(mem_if_a.we),
+    .addra(mem_if_a.addr[ADDR_WIDTH-1:2]),
+    .dina(mem_if_a.din),
+    .douta(mem_if_a.dout),
 
-  // output signals
-  always @(*)
-  begin
-    en_to_blkmem_a = mem_if_a.en;
-    valid_to_ext_a = 0;
+    .clkb(clk_b),
+    .enb(en_to_blkmem_b),
+    .web(mem_if_b.we),
+    .addrb(mem_if_b.addr[ADDR_WIDTH-1:2]),
+    .dinb(mem_if_b.din),
+    .doutb(mem_if_b.dout)
+  );
 
-    case (state_aq)
-      IDLE:
-      begin
-        en_to_blkmem_a = mem_if_a.en;
-        valid_to_ext_a = 0;
-      end
 
-      WAIT:
-      begin
-        en_to_blkmem_a = 1;
-        valid_to_ext_a = 0;
-      end
-
-      READ:
-      begin
-        en_to_blkmem_a = 0;
-        valid_to_ext_a = 1;
-      end
-    endcase
-  end
-
-  assign mem_if_a.valid = valid_to_ext_a;
-
-  // read control for port b ---------------------------------------------------
-  wire read_request_b;
-  wire read_wait_done_b;
-
-  reg [1:0] wait_counter_b;
-  reg [1:0] wait_counter_next_b;
-
-  reg en_to_blkmem_b;
-  reg valid_to_ext_b;
-
-  // transition condition calculation
-  assign read_request_b   = (mem_if_b.en == 1'b1 && mem_if_b.we == 4'b0);
-  assign read_wait_done_b = (wait_counter_b == READ_LATENCY-1);
-
-  always @(posedge clk_b, negedge arstz_bq)
-    if (arstz_bq == 1'b0) state_bq <= IDLE;
-    else state_bq <= next_state_b;
-
-  always @(*)
-  begin
-    next_state_b = state_bq;
-    case (state_bq)
-      IDLE:
-      begin
-        if (read_request_b)
-        begin
-          if (READ_LATENCY == 1) next_state_b = READ;
-          else                   next_state_b = WAIT;
-        end
-      end
-
-      WAIT:
-      begin
-        if (read_wait_done_b) next_state_b = READ;
-      end
-
-      READ:
-      begin
-        next_state_b = IDLE;
-      end
-    endcase
-  end
-
-  // Clock count for WAIT state
-  always @(posedge clk_b, negedge arstz_bq)
-    if (arstz_bq == 1'b0) wait_counter_b <= 0;
-    else wait_counter_b <= wait_counter_next_b;
-
-  always @(*)
-  begin
-    wait_counter_next_b = wait_counter_b;
-    case (state_bq)
-      IDLE: wait_counter_next_b = 2'b1;
-      WAIT: wait_counter_next_b = wait_counter_b + 1'b1;
-      default: wait_counter_next_b = 0;
-    endcase
-  end
-
-  // output signals
-  always @(*)
-  begin
-    en_to_blkmem_b = mem_if_b.en;
-    valid_to_ext_b = 0;
-
-    case (state_bq)
-      IDLE:
-      begin
-        en_to_blkmem_b = mem_if_b.en;
-        valid_to_ext_b = 0;
-      end
-
-      WAIT:
-      begin
-        en_to_blkmem_b = 1;
-        valid_to_ext_b = 0;
-      end
-
-      READ:
-      begin
-        en_to_blkmem_b = 0;
-        valid_to_ext_b = 1;
-      end
-    endcase
-  end
-
-  assign mem_if_b.valid = valid_to_ext_b;
+`else
 
   // native block memory connections -------------------------------------------
   blk_mem_gen_0 i_blk_mem (
@@ -220,5 +142,7 @@ module blk_mem_wrapper #(
     .doutb(mem_if_b.dout)
   );
   // ---------------------------------------------------------------------------
+
+`endif
 
 endmodule
